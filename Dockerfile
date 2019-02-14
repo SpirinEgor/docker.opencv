@@ -22,6 +22,7 @@ FROM alpine:latest
 # See http://cxxtest.com/guide.html#_test_discovery_options
 RUN apk --no-cache add\
   python3 \
+  python3-dev \
   g++ \
   make \
   bash \
@@ -61,20 +62,22 @@ RUN apk add --update --no-cache \
       libwebp-dev \
       # A C language family front-end for LLVM (development files)
       clang-dev \
-      linux-headers 
+      linux-headers && \
+  pip3 install numpy
 
 ENV CC /usr/bin/clang
 ENV CXX /usr/bin/clang++
 
 ENV OPENCV_VERSION=3.4.3
 
-RUN mkdir /opt && cd /opt && \
+RUN mkdir opencv && cd opencv && \
   wget https://github.com/opencv/opencv/archive/${OPENCV_VERSION}.zip && \
   unzip ${OPENCV_VERSION}.zip && \
-  rm -rf ${OPENCV_VERSION}.zip
+  rm -rf ${OPENCV_VERSION}.zip && \
+  cd opencv-${OPENCV_VERSION}
 
-RUN mkdir -p /opt/opencv-${OPENCV_VERSION}/build && \
-  cd /opt/opencv-${OPENCV_VERSION}/build && \
+RUN mkdir -p opencv/opencv-${OPENCV_VERSION}/build && \
+  cd opencv/opencv-${OPENCV_VERSION}/build && \
   cmake \
   -D CMAKE_BUILD_TYPE=RELEASE \
   -D CMAKE_INSTALL_PREFIX=/usr/local \
@@ -95,8 +98,14 @@ RUN mkdir -p /opt/opencv-${OPENCV_VERSION}/build && \
   -D PYTHON3_PACKAGES_PATH=/usr/local/lib/python3.6/site-packages/ \
   -D PYTHON3_NUMPY_INCLUDE_DIRS=/usr/local/lib/python3.6/site-packages/numpy/core/include/ \
   .. && \
-  make VERBOSE=1 && \
-  make && \
-  make install && \
-  rm -rf /opt/opencv-${OPENCV_VERSION}
+  make -j7 && \
+  make install
 
+RUN rm -rf opencv
+ENV PKG_CONFIG_PATH="${PKG_CONFIG_PATH}:/usr/local/lib64/pkgconfig"
+ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/usr/local/lib:/usr/local/lib64"
+
+#install packages for protobuf
+RUN apk add --no-cache --update autoconf automake libtool
+ADD install_protobuf.sh /tmp/install_protobuf.sh
+RUN set -ex && /tmp/install_protobuf.sh
